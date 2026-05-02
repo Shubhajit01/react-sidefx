@@ -1,0 +1,224 @@
+---
+title: createResource
+---
+# createResource
+
+A factory that creates a Suspense-native async resource with built-in caching. Instead of managing loading states manually, `createResource` integrates directly with React's Suspense and error boundary model.
+
+```ts
+import { createResource } from 'react-sidefx'
+```
+
+---
+
+## Signature
+
+```ts
+function createResource<TInput, TOutput>(
+  fn: (input: TInput) => Promise<TOutput>,
+  resourceName?: string,
+): Resource<TInput, TOutput>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `fn` | `(input: TInput) => Promise<TOutput>` | The async function that fetches or computes the data |
+| `resourceName` | `string` (optional) | A name for the resource, used as a cache key prefix. Defaults to a random string |
+
+### Returns
+
+A `Resource<TInput, TOutput>` object.
+
+---
+
+## Basic Usage
+
+Define the resource **outside** the component. This is important — defining it inside would recreate the cache on every render.
+
+```tsx
+import { createResource } from 'react-sidefx'
+import { Suspense } from 'react'
+
+async function getUser(id: string) {
+  const res = await fetch(`/api/users/${id}`)
+  return res.json()
+}
+
+const userResource = createResource(getUser, 'user')
+
+function UserProfile() {
+  const user = userResource.use('user-123')
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>{user.email}</p>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Suspense fallback="Loading...">
+      <UserProfile />
+    </Suspense>
+  )
+}
+```
+
+---
+
+## Resource API
+
+### `resource.use(input)`
+
+A hook that suspends the component until the data is ready. Must be used inside a `Suspense` boundary. Errors thrown by `fn` will propagate to the nearest error boundary.
+
+```ts
+const user = userResource.use('user-123')
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `input` | `TInput` | The argument passed to `fn`. Also used as part of the cache key |
+
+**Returns:** `TOutput` — the resolved value of `fn`.
+
+> **Note:** Call `resource.use()` at the top level of your component, following the rules of hooks.
+
+---
+
+### `resource.get(input)`
+
+Imperatively fetches or retrieves the cached promise. Use this outside of components — in event handlers, prefetch logic, or server utilities.
+
+```ts
+const user = await userResource.get('user-123')
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `input` | `TInput` | The argument passed to `fn` |
+
+**Returns:** `Promise<TOutput>`
+
+---
+
+### `resource.refresh(input)`
+
+Re-runs `fn` for the given input, updates the cache with the new promise, and notifies any components currently using `resource.use(input)` to re-suspend with the fresh data.
+
+```ts
+userResource.refresh('user-123')
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `input` | `TInput` | The argument to re-fetch |
+
+**Returns:** `void`
+
+> **Note:** Components using `resource.use(input)` will immediately re-suspend and show the nearest `Suspense` fallback while the new data loads.
+
+---
+
+### `resource.discard(input)`
+
+Removes the cached entry for the given input. The next call to `resource.use(input)` or `resource.get(input)` will trigger a fresh fetch. Does **not** force a re-render on its own.
+
+```ts
+userResource.discard('user-123')
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `input` | `TInput` | The argument whose cache entry should be removed |
+
+**Returns:** `void`
+
+> **Note:** Unlike `refresh`, `discard` is silent — it removes the cache but does not notify components. Use `refresh` if you want components to immediately react to the change.
+
+---
+
+## `refresh` vs `discard`
+
+| | `refresh` | `discard` |
+|---|---|---|
+| Updates cache | ✅ | ❌ |
+| Triggers re-render | ✅ | ❌ |
+| Use case | Invalidate and immediately reload | Lazy invalidation — reload on next access |
+
+---
+
+## Caching
+
+The cache is scoped to the resource instance. Two resources created with `createResource` have completely separate caches, even if they use the same `fn`.
+
+Cache keys are derived from `resourceName` (or a random prefix if omitted) combined with a JSON serialization of `input`:
+
+```
+__user__"user-123"
+```
+
+This means:
+- Primitive inputs (`string`, `number`) work out of the box
+- Object inputs are serialized with `JSON.stringify` — key order matters
+- `{ id: 1, role: 'admin' }` and `{ role: 'admin', id: 1 }` will produce **different** cache keys
+
+---
+
+## Error Handling
+
+If `fn` throws or the returned promise rejects, the error will propagate to the nearest React error boundary. Wrap your `Suspense` boundary with an error boundary to handle this gracefully.
+
+```tsx
+import { ErrorBoundary } from 'react-error-boundary'
+
+export default function App() {
+  return (
+    <ErrorBoundary fallback={<p>Something went wrong</p>}>
+      <Suspense fallback="Loading...">
+        <UserProfile />
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+```
+
+---
+
+## TypeScript
+
+`createResource` is fully typed. `TInput` and `TOutput` are inferred from `fn`:
+
+```ts
+async function getUser(id: string): Promise<{ name: string; email: string }> {
+  // ...
+}
+
+const userResource = createResource(getUser, 'user')
+// userResource is Resource<string, { name: string; email: string }>
+
+const user = userResource.use('user-123')
+// user is { name: string; email: string }
+```
+
+---
+
+## Prefetching
+
+Since `resource.get()` is imperative, you can prefetch data before a component mounts:
+
+```tsx
+function UserListItem({ id }: { id: string }) {
+  return (
+    <li onMouseEnter={() => userResource.get(id)}>
+      <Link to={`/users/${id}`}>View profile</Link>
+    </li>
+  )
+}
+```
+
+Hovering over the list item starts fetching the user in the background. By the time the user navigates, the data is likely already cached.
