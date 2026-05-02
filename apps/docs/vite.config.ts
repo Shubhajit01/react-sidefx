@@ -5,6 +5,7 @@ import mdx from 'fumadocs-mdx/vite';
 import * as MdxConfig from './source.config';
 
 export default defineConfig({
+  base: "/react-sidefx/",
   plugins: [mdx(MdxConfig), tailwindcss(), reactRouter()],
   resolve: {
     tsconfigPaths: true,
