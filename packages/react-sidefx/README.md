@@ -1,29 +1,48 @@
-# react-components-starter
+# react-sidefx
 
-A starter for creating a React component library.
+A collection of React primitives for managing side effects — built for React 19 with Suspense, concurrent features, and modern patterns in mind.
 
-## Development
+## Philosophy
 
-- Install dependencies:
+Most side effect patterns in React are either too low-level (raw `useEffect`) or too opinionated (full data-fetching libraries). `react-sidefx` sits in between — small, composable primitives that do one thing well and get out of your way.
 
-```bash
-npm install
-```
-
-- Run the playground:
+## Installation
 
 ```bash
-npm run play
+npm install react-sidefx
 ```
 
-- Run the unit tests:
+## What's inside
 
-```bash
-npm run test
+### `createResource`
+
+A Suspense-native async primitive with built-in caching. No loading states, no `useEffect`, no boilerplate — just your data.
+
+```tsx
+import { createResource } from "react-sidefx";
+import { Suspense } from "react";
+
+const userResource = createResource(getUser, "user");
+
+function UserProfile() {
+  const user = userResource.use("user-123");
+  return <h1>{user.name}</h1>;
+}
+
+export default function App() {
+  return (
+    <Suspense fallback="Loading...">
+      <UserProfile />
+    </Suspense>
+  );
+}
 ```
 
-- Build the library:
+## Requirements
 
-```bash
-npm run build
-```
+- React 19+
+- TypeScript 5+ (recommended)
+
+## License
+
+MIT
