@@ -1,7 +1,7 @@
 {
   "name": "react-sidefx",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A collection of production ready side effects for react.",
   "author": "chatterjee.shubhajit01@gmail.com",
   "license": "MIT",
