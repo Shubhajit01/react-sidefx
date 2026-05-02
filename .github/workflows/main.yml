@@ -45,7 +45,7 @@ jobs:
           CI: true
 
       - name: Copy index.html to 404.html for CSR
-        run: cp apps/docs/build/index.html apps/docs/build/404.html
+        run: cp apps/docs/build/client/index.html apps/docs/build/client/404.html
 
       - name: Upload build artifact for Pages
         uses: actions/upload-pages-artifact@v3
